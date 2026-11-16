@@ -1101,4 +1101,5 @@ def get_contract_status(
 
 
 if __name__ == '__main__':
-    print(get_contract_status('C006').model_dump_json(indent=2))
+    client_id = input("Enter client ID: ").strip()
+    print(get_contract_status(client_id).model_dump_json(indent=2))
