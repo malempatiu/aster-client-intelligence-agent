@@ -4,7 +4,7 @@ import pytest
 
 from src.database import CLIENT_COLUMNS
 from src.main import main
-from src.resolver import resolve_client
+from src.tools.resolver import resolve_client
 
 CLIENTS = [
     ("C001", "Halden Bet"),

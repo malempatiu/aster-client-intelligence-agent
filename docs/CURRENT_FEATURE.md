@@ -1,20 +1,32 @@
-# Current Feature
-
-<!-- Feature Name -->
+# Current Feature: Client Profile Tool
 
 ## Status
 
 <!-- Not Started|In Progress|Completed -->
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Goals & requirements -->
+- Deterministic tool that retrieves a client's account profile by canonical (already-resolved) `client_id`
+- No fuzzy matching or name resolution inside the tool
+- Reuse the existing SQLite connection utility (`src/database.py`) with parameterised SQL against the `clients` table
+- `ClientProfile` Pydantic model (create or reuse) returning all seven client fields, source table, source primary key (`client_id`), and data-quality warnings
+- Retrieve segment, country, owner, customer_since, tier
+- Parse `customer_since` as a date where valid; warn on invalid dates
+- Preserve missing optional values as missing with a warning; never invent or substitute values
+- Unknown `client_id` returns a clear not-found result or a documented exception
+- CLI: after successful resolution, invoke the profile tool and display the profile readably
+- pytest tests: successful retrieval, correct client ID, all fields retrieved, missing optional values, invalid `customer_since`, unknown client ID, database errors, source primary key preservation
+- Temporary SQLite databases for controlled cases, plus an integration test against the supplied read-only database
 
 ## Notes
 
-<!-- Any extra notes -->
+- Spec: `docs/features/client-profile-implementation.md`
+- Before implementing: read AGENTS.md and TECH_STACK.md, inspect project structure, existing Pydantic models, and the actual `clients` table schema
+- Location: use the existing `src/tools/` directory and naming conventions (spec recommends `src/tools/resolver.py`; avoid duplicating the client resolver — extend that module only if consistent with project structure)
+- Working tree already has uncommitted changes moving `src/resolver.py` → `src/tools/resolver.py` (with `src/main.py` and `tests/test_resolver.py` import updates)
+- Out of scope: contract analysis, usage analysis, LLM calls, planner, orchestrator, modifying the original database, CSV files
 
 ## History
 

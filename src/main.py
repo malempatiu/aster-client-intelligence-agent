@@ -6,10 +6,21 @@ from typing import get_args
 from pydantic import ValidationError
 
 from src.database import DatabaseError
+from src.models.profile import ClientProfile
 from src.models.requests import ClientRequest, Trigger
-from src.resolver import resolve_client
+from src.tools.client_profile import ClientNotFoundError, get_client_profile
+from src.tools.resolver import resolve_client
 
 TRIGGERS = get_args(Trigger)
+PROFILE_LABELS = {
+    "client_id": "Client ID",
+    "client_name": "Name",
+    "segment": "Segment",
+    "country": "Country",
+    "account_owner": "Owner",
+    "customer_since": "Customer since",
+    "tier": "Tier",
+}
 
 
 class Parser(argparse.ArgumentParser):
@@ -39,6 +50,15 @@ def describe(err: dict) -> str:
     return f"{field}: {err['msg']}"
 
 
+def print_profile(profile: ClientProfile) -> None:
+    print(f"\nClient profile (source: {profile.source_table}.client_id = {profile.source_primary_key})")
+    for field, label in PROFILE_LABELS.items():
+        value = getattr(profile, field)
+        print(f"  {label:<15} {value if value is not None else '-'}")
+    for warning in profile.warnings:
+        print(f"  Warning: {warning}")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     fields = {
@@ -64,8 +84,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
-    if resolution.status == "resolved":
+    if resolution.status == "resolved" and resolution.client_id is not None:
         print(f"Client resolved: {resolution.client_id} {resolution.client_name}")
+        try:
+            profile = get_client_profile(resolution.client_id)
+        except (DatabaseError, ClientNotFoundError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+        print_profile(profile)
         return 0
     if resolution.status == "ambiguous":
         print(f"Error: '{request.client}' did not match a single client. Did you mean:", file=sys.stderr)
