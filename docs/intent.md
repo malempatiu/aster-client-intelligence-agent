@@ -19,6 +19,22 @@ We are replacing that manual process with an agent.
 A working prototype of a client intelligence agent with trustworthy cited client briefing in one click. 
 Given a client and a trigger, it should gather evidence from the starter data(sqlite), analyse it, and produce a short briefing for the sales rep in which every claim is grounded in the data and cited.
 
+## Must-haves (from the candidate brief)
+
+These are non-negotiable. Everything else in this document refines them.
+
+1. **One command** takes a client (name or ID) and a trigger, and writes a briefing (Markdown) plus an evidence file containing the tool outputs it used.
+2. **Deterministic tools** covering at least:
+   - contract and renewal status
+   - usage trends
+   - white-space: products the client does not hold, with evidence for why they might fit
+   - support summary
+   - meeting notes
+3. **A planning step** that chooses analyses and emphasis for each trigger, driven by configuration (our choice, see 7.3), not by code for particular clients.
+4. **A writer** that cites a source for every figure and claim, and **a verifier** that checks every number in the briefing appears in the evidence and every claim has a citation. We must decide what happens when the check fails and explain why (see section 8).
+5. **Honest data handling:** duplicates, missing months, short histories and conflicts between sources are detected and shown in a "Data gaps and confidence" section, not hidden.
+6. **A short evaluation:** run at least 3 clients × 2 triggers, include an automated check for numbers in a briefing that do not appear in the tool outputs, and report what we found, including failures (see section 12).
+
 ## Who it is for
 
 - **Primary user**: a sales rep (account owner) who is short of time and needs to walk into a conversation prepared. They will not read evidence files unless something looks wrong, so the briefing must be short (about one page), lead with what matters, and end with concrete next steps.
@@ -32,7 +48,7 @@ A working prototype with this flow:
 ```
 client (name/ID) + trigger (+ optional rep context)
    -> resolve client            (code)
-   -> plan analyses             (config, optional light LLM adjustment)
+   -> plan analyses             (config-driven, per trigger)
    -> run deterministic tools   (SQL/pandas, no LLM)
    -> aggregate evidence        (code)  -> evidence.json
    -> write briefing            (LLM, evidence only, citations required)
@@ -172,4 +188,53 @@ A useful briefing typically covers some of: headline, account snapshot, contract
 - When data is missing, sparse or inconsistent, the briefing says so instead of filling the gap.
 ### 7.3 It is orchestrated
 - Work is broken into steps with clear jobs: for example planner, deterministic tools, writer, verifier.
-- Planning is driven by configuration or model reasoning, not by code for particular clients or triggers.
+- Planning is driven by configuration, not by code for particular clients or triggers. A YAML plan per trigger chooses the analyses, the sections and their order, and what to emphasise. It does not need an LLM. Data availability can still cause a section to be skipped (for example, no meeting notes), and `plan.json` records why.
+
+## 8. Decisions
+
+**Interface: CLI only.** "One click" means one command, e.g. `aster brief "<client>" <trigger> [--context "..."]`. There is no web UI.
+
+**Client resolution: never guess.** The client is resolved from an exact ID or a name match. If the name is ambiguous (several candidates) or matches nothing, the run stops without producing a briefing and prints the ranked candidates, so the rep can rerun with an ID. There is no interactive prompt.
+
+**Rep context: emphasis only.** The optional free-text context can change emphasis and which sections lead. It is never treated as evidence, never cited, and never adds analyses. If a statement from it appears in the briefing, it is labelled "per rep".
+
+**Models: configurable.** Model names live in config, with one default model and optional overrides per role (writer, verifier). No model name is hard-coded.
+
+**When verification still fails.** After the single repair attempt:
+- numeric claims that still fail are removed from `briefing.md`
+- qualitative claims that still fail stay in, marked ⚠ unverified
+- every removed or flagged claim is listed in the Data Gaps and Confidence section and recorded in the verification report
+
+*Why:*
+- **Repair first.** Most failures are citation or formatting slips (a missing `[fact_id]`, a rounded figure) that one targeted rewrite fixes cheaply. Repairing more than once costs more and can drift away from the evidence.
+- **Remove failed numbers.** A rep will quote a figure to the client, so a wrong number does more harm than a missing one. A number we cannot trace to a tool output must not reach the rep.
+- **Flag failed qualitative claims.** These are interpretations of cited evidence, and removing them can leave the briefing without the context the rep needs. A visible ⚠ keeps the context while being honest about what we could not verify.
+
+## 9. Constraints
+
+- **Deadline: about one week.** Prefer the simplest design that meets the success criteria.
+- Business data comes only from `starter_pack/client_intel.db`, which is opened read-only (see section 5).
+
+## 10. Out of scope
+
+- Authentication, multiple users, and per-rep access control.
+- Live integrations with real CRM, billing or support systems. The SQLite snapshot is the only source.
+- Sending, emailing or publishing briefings. Output goes to local files only.
+- Forecasting or ML models (e.g. predictive churn). Analyses are descriptive trends and explicit rules only.
+
+## 11. What success looks like
+
+The prototype is done when all of these hold:
+
+1. **Coverage:** every combination of the 25 clients and 4 triggers (100 runs) produces a briefing without crashing, including clients with sparse or missing data.
+2. **Grounding:** every factual and numeric claim in `briefing.md` maps to a `fact_id` in `evidence.json` and passes verification. Claims that fail are handled as described in section 8, never left in silently.
+3. **Live change:** a new trigger can be added in under 15 minutes by editing config and adding a test, with no changes to orchestration code.
+4. **Tests:** pytest covers each deterministic tool and each data-quality rule in section 5, run against the real database.
+5. **Evaluation delivered:** the evaluation in section 12 has been run and its report is committed, including any failures.
+
+## 12. Evaluation
+
+- **Scope:** at least 3 clients × 2 triggers. Choose clients that differ: at least one with clean data, one with sparse or short history, and one with duplicates or conflicts between sources. Chosen by inspecting the data, never hard-coded.
+- **Automated check for unsupported numbers:** a script (and pytest test) that pulls every number out of `briefing.md` and checks that it appears in that run's tool outputs in `evidence.json`. It allows only the rounding and format differences defined in config (e.g. `1,234` vs `1234`, `12.3%` vs `0.123`). Any number it cannot match fails the check. This check runs separately from the in-pipeline verifier and does not trust it.
+- **Also recorded per run:** citation coverage, claims repaired, removed or flagged, data gaps surfaced, runtime, tokens and cost (from `trace.json`).
+- **Report:** `eval/REPORT.md` with a results table per run, the failures found and their causes, what we fixed, and what we left as known limitations. Failures are reported, not hidden.
