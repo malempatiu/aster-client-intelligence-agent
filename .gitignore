@@ -28,8 +28,6 @@ coverage/
 *.db-wal
 *.db-shm
 
-starter_pack
-
 .claude/settings.local.json
 
 .idea/
