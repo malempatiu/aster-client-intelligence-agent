@@ -5,7 +5,9 @@ from typing import get_args
 
 from pydantic import ValidationError
 
+from src.database import DatabaseError
 from src.models.requests import ClientRequest, Trigger
+from src.resolver import resolve_client
 
 TRIGGERS = get_args(Trigger)
 
@@ -55,7 +57,24 @@ def main(argv: list[str] | None = None) -> int:
     print("Request validated.")
     for name, value in request.model_dump().items():
         print(f"  {name:<12} {value if value is not None else '-'}")
-    return 0
+
+    try:
+        resolution = resolve_client(request.client)
+    except DatabaseError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    if resolution.status == "resolved":
+        print(f"Client resolved: {resolution.client_id} {resolution.client_name}")
+        return 0
+    if resolution.status == "ambiguous":
+        print(f"Error: '{request.client}' did not match a single client. Did you mean:", file=sys.stderr)
+        for c in resolution.candidates:
+            print(f"  {c.client_id}  {c.client_name}", file=sys.stderr)
+        print("Re-run with the client ID.", file=sys.stderr)
+        return 1
+    print(f"Error: no client found matching '{request.client}'.", file=sys.stderr)
+    return 1
 
 
 if __name__ == "__main__":
