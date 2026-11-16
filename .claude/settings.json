@@ -1,13 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(uv sync)",
-      "Bash(uv add *)"
+      "Bash(uv sync)"
     ],
     "deny": [
       "Read(./.env)"
     ],
     "ask": [
+      "Bash(uv add *)",
       "Bash(git push *)"
     ]
   }

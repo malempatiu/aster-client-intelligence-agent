@@ -1,6 +1,6 @@
 # Review Action
 
-1. Read CURRENT_FEATURE.md.md to understand the goals
+1. Read CURRENT_FEATURE.md to understand the goals
 2. Review all code changes made for this feature
 3. Check for:
    - ✅ Goals met
