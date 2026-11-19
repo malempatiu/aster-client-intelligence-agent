@@ -15,6 +15,25 @@ uv run -m src.main --client "Halden Bet" --trigger at_risk
 
 The current CLI does **not** call an LLM or require an API key. For a future LLM-enabled version, use a placeholder in local setup documentation, never a committed secret, for example `OPENAI_API_KEY=YOUR_API_KEY`.
 
+## Highlevel Architecture
+
+<img width="1682" height="4230" alt="mermaid-diagram" src="https://github.com/user-attachments/assets/b5e130e3-cf47-47e1-b7ce-fd67b81c0c58" />
+
+- Planner: Decides what to investigate.
+
+- Orchestrator: Coordinates tool execution.
+
+- Specialist tools: Retrieve and calculate business information.
+
+- Evidence aggregator: Packages results and source references.
+
+- Writer: Generates the cited briefing.
+
+- Verifier: Checks factual correctness and briefing quality.
+
+- Evaluation framework: Measures performance across multiple clients and triggers.
+
+
 ## Design and status
 
 The runtime flow implemented today is:
